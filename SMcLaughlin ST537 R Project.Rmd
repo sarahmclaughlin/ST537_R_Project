@@ -9,6 +9,9 @@ output: pdf_document
 knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(MASS)
+library(klaR)
+library(MASS)
+library(knitr)
 ```
 
 # Classification Method for Analysis of Wine Data Set  
@@ -36,7 +39,31 @@ wine.train <- wine[train, ]
 wine.test <- wine[test, ]
 ```  
 
+Calculate the "No Information Rate". 
+```{r SM NIR}
+# Calculate frequency table
+tab <- table(wine$quality)
+tab
+# Calculate NIR
+NIR <- max(tab)/sum(tab)
+```
+The No Information Rate is `r round(NIR, 3)`. Thus, if we classified each wine sample into the largest quality group (6), our model would be correct about 44% of the time. The Classification Model that we create must have a better accuracy than 44%.  
+
 ## Linear Discriminant Analysis  
+**Assumptions:**  
+
+**Running the Linear Discriminant Analysis:**  
 ```{r SM LDA}
+# Create LDA Model with Training Set 
+lda.out <- lda(quality ~ ., data = wine.train)
+
+# Calculate test quality using LDA Model 
+lda.pred <- predict(lda.out, newdata = wine.test)
+
+# Create error matrix  
+lda.err <- errormatrix(true = wine.test$quality, predicted = lda.pred$class, 
+                       relative = TRUE)
+
+kable(round(lda.err, 3))
 ```
 
