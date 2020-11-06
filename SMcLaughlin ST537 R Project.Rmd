@@ -10,12 +10,15 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(MASS)
 library(klaR)
-library(MASS)
 library(knitr)
+library(class)
 ```
 
 # Classification Method for Analysis of Wine Data Set  
 Bring in the data and split into training and testing sets.  
+
+**Note on Quality Sizes:** 
+Because there are only 5 wines with quality of 9 and 30 with a quality of 3, we will remove these from our data set. Having so few wines with quality 3 or 9 will cause issues with our quadratic discriminant analysis. 
 ```{r SM wine data}
 # Bring in the two data sets 
 red.wine <- read.csv("winequality-red.csv", header = TRUE, sep = ";")
@@ -27,8 +30,13 @@ white.wine$color <- c("white")
 
 # Combine data into one data set  
 wine <- rbind(red.wine, white.wine)
+
 # Make color a factor 
 wine$color <- as.factor(wine$color)
+
+# Get rid of quality = 9 grouping.  
+wine <- wine %>% filter(wine$quality < 9) 
+wine <- wine %>% filter(wine$quality > 3)
 
 # Train and test set 
 set.seed(1)
@@ -37,9 +45,9 @@ test <- setdiff(1:nrow(wine), train)
 
 wine.train <- wine[train, ]
 wine.test <- wine[test, ]
-```  
+```
 
-Calculate the "No Information Rate". 
+Calculate the "No Information Rate".  
 ```{r SM NIR}
 # Calculate frequency table
 tab <- table(wine$quality)
@@ -48,6 +56,11 @@ tab
 NIR <- max(tab)/sum(tab)
 ```
 The No Information Rate is `r round(NIR, 3)`. Thus, if we classified each wine sample into the largest quality group (6), our model would be correct about 44% of the time. The Classification Model that we create must have a better accuracy than 44%.  
+
+Calculate the covariance matrix of each quality group.  
+```{r SM Covariance}
+
+```
 
 ## Linear Discriminant Analysis  
 **Assumptions:**  
@@ -65,5 +78,43 @@ lda.err <- errormatrix(true = wine.test$quality, predicted = lda.pred$class,
                        relative = TRUE)
 
 kable(round(lda.err, 3))
+
+# Assign APER Value
+lda.aper <- 0.440
 ```
+**Evaluation of Classifier:**  
+The accuracy of the classifier is `r 1 - lda.aper`. This is better than the No Information Rate.  
+
+## Quadratic Discriminant Analysis  
+**Assumptions:**  
+
+**Running the Quadratic Discriminant Analysis:**  
+```{r SM QDA}
+# Create QDA Model with Training Set 
+qda.out <- qda(quality ~ ., data = wine.train)
+
+# Calculate test quality using QDA Model 
+qda.pred <- predict(qda.out, newdata = wine.test)
+
+# Create error matrix 
+qda.err <- errormatrix(true = wine.test$quality, predicted = qda.pred$class, relative = TRUE)
+
+kable(round(qda.err,3))
+
+# Assign APER Value
+qda.aper <- 0.509
+```
+**Evaluation of Classifier:**  
+The accuracy of the classifier is `r 1 - qda.aper`. This is better than the No Information Rate.  
+
+## k-Nearest Neighbor Classifier  
+```{r SM KNN}
+knn.out <- knn(train = 
+                 wine.train[ , -wine.train$quality], 
+               test = 
+                 wine.test[ , - wine.test$quality], 
+               class = wine$quality, 
+               k = 3)
+```
+
 
