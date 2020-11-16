@@ -12,7 +12,18 @@ library(MASS)
 library(klaR)
 library(knitr)
 library(class)
+library(caret)
+library(e1071)
+library(rpart)
+library(rattle)
 ```
+
+# Introduction to Classification Methods  
+When working with a multivariate dataset, specifically one that divides the data into different groups, the goal is to use **discrimination** within the dataset to be able to **classify** a new object appropriately. **Discrimination** is using the existing features within a data set that separate known groups in a multivariate dataset. Based on those features, we create a classification rule. In this section, we will use four classification methods (*Linear Discriminant Analysis*, *Quadratic Discriminant Analysis*, *Classification Trees*, and *k-Nearest Neighbors*) in an attempt to create an appropriate classification model for the data. We will evaluate the effectiveness of a particular model using the **APER** (Apparent Error), the **Accuracy**  and the **Misclassification Error**. The formula for calculating the **APER** and **Accuracy** is below:  
+$$APER = \frac{Total Incorrect Classification}{Total Number of Points}$$ 
+$$Accuracy = 1 - APER$$  
+
+---  
 
 # Classification Method for Analysis of Wine Data Set  
 Bring in the data and split into training and testing sets.  
@@ -57,13 +68,11 @@ NIR <- max(tab)/sum(tab)
 ```
 The No Information Rate is `r round(NIR, 3)`. Thus, if we classified each wine sample into the largest quality group (6), our model would be correct about 44% of the time. The Classification Model that we create must have a better accuracy than 44%.  
 
-Calculate the covariance matrix of each quality group.  
-```{r SM Covariance}
-
-```
+---  
 
 ## Linear Discriminant Analysis  
 **Assumptions:**  
+For Linear Discriminant Analysis, we assume that the data is multivariate Normal with different means but the same covariance matrix for each quality class.  
 
 **Running the Linear Discriminant Analysis:**  
 ```{r SM LDA}
@@ -85,8 +94,11 @@ lda.aper <- 0.440
 **Evaluation of Classifier:**  
 The accuracy of the classifier is `r 1 - lda.aper`. This is better than the No Information Rate.  
 
+---  
+
 ## Quadratic Discriminant Analysis  
 **Assumptions:**  
+For Quadratic Discriminant Analysis, we assume that the data is multivariate Normal with different means and different covariance matrices for each quality class.  
 
 **Running the Quadratic Discriminant Analysis:**  
 ```{r SM QDA}
@@ -107,14 +119,78 @@ qda.aper <- 0.509
 **Evaluation of Classifier:**  
 The accuracy of the classifier is `r 1 - qda.aper`. This is better than the No Information Rate.  
 
+---  
+
 ## k-Nearest Neighbor Classifier  
+The k-Nearest Neighbor Classifier is a model-free approach to classification. We do not assume a probability model on the data like LDA and QDA. Here, we graph the data and the new data is given the same class value as that of the majority of a pre-specified number of points closest to it. Here, we use Euclidean distance for that closeness measure. We will be using the `caret` package and the `train` function to run k-Nearest Neighbors.  
+
+**Determining the Number of Neighbors**  
+Below, we will use the `caret` package to train the k-NN classifier. Running the code below will tell us how many of the neighbors should be used in our classifier.  
 ```{r SM KNN}
-knn.out <- knn(train = 
-                 wine.train[ , -wine.train$quality], 
-               test = 
-                 wine.test[ , - wine.test$quality], 
-               class = wine$quality, 
-               k = 3)
+# Make Quality a Factor 
+wine.train$quality <- as.factor(wine.train$quality)
+wine.test$qualtiy <- as.factor(wine.test$quality)
+
+# Settings
+trctrl <- trainControl(method = "repeatedCV", 
+                       number = 10, 
+                       repeats = 3)
+
+set.seed(123)
+
+knn.fit <- train(quality ~ ., data = wine.train, 
+                 method = "knn", trControl = trctrl, 
+                 preProcess = c("center", "scale"), 
+                 tuneGrid = data.frame(k = 2:10))
+
+knn.fit
+```
+The number of neighbors that will be used in 3.  
+
+**Creating the k-Nearest Neighbors Model with k = 3 Neighbors**  
+```{r SM KNN Fit}
+# Predict using the knn.fit  
+test.pred <- predict(knn.fit, newdata = wine.test)
+
+# Create the confusion matrix 
+knn.err <- errormatrix(true = wine.test$quality, predicted = test.pred, relative = TRUE)
+
+round(knn.err,3)
+
+# Assign the APER Value 
+knn.aper <- 0.437
 ```
 
+**Evaluation of the Classifier:**  
+The accuracy of the classifier is `r 1 - knn.aper`. This is better than the No Information Rate.  
 
+---  
+
+## Classification Trees  
+Classification Trees create classification rules based on partioning the data using binary splitting. A number of the variables are split into regions, and the groups are classified that way. 
+
+**Creating the Classification Tree**  
+```{r SM ClassTree}
+# Create Tree
+tree.fit <- rpart(quality ~ ., data = wine.train, 
+                  method = "class", 
+                  control = rpart.control(cp = 0.05))
+
+# Draw the Tree
+fancyRpartPlot(tree.fit, sub = "", main = "")
+```
+
+**Use Tree for Prediction**  
+```{r SM Tree Predict}
+tree.pred <- predict(tree.fit, wine.test, type = "class")
+
+# Create the confusion matrix 
+tree.err <- errormatrix(true = wine.test$quality, predicted = tree.pred, relative = TRUE)
+
+round(tree.err,3)
+
+# Assign the APER Value 
+tree.aper <- 0.462
+```
+**Analysis of Classification Tree**  
+The accuracy is `r 1 - tree.aper`. This is better than the no information rate.  
